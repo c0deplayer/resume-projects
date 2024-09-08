@@ -1,0 +1,33 @@
+data_path: "./dataset/knee-osteoarthritis"
+checkpoint_path: "./checkpoints"
+
+label_map:
+  1: 0
+  2: 1
+  3: 2
+  4: 2
+label_map_legend:
+  0: "No/Minimal"
+  1: "Mild"
+  2: "Advanced"
+# num_of_samples:
+#   0: 2000
+#   1: 2000
+img_size: [ 244, 244 ]
+shuffle: True
+augment: False
+augment_v2: False
+
+epochs: 50
+batch_size: 80
+hidden_size: 128
+dropout: 0.4
+trainable_model: False
+learning_rate: 1e-3
+activation: "relu"
+optimizer: "AdamW"
+weight_decay: 1e-2
+# momentum: 0.9
+
+seed: 42
+
