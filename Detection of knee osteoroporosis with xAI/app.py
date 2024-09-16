@@ -31,7 +31,6 @@ def init_model(
 
     config = CONFIGS[selected_model].from_yaml_file(file=selected_config)
     class_count = len(config.label_map_legend)
-    # device = utils.get_device()
 
     utils.seed_everything(config.seed)
 
