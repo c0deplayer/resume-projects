@@ -19,13 +19,10 @@ dependencies = [
     "xgboost>=2.1.1",
     "catboost>=1.2.5",
     "statsmodels>=0.14.2",
-    "keras>=3.5.0",
-    "gradio>=4.42.0",
     "scikit-image>=0.24.0",
     "lime>=0.2.0.1",
     "opencv-python>=4.10.0.84",
     "PyYAML>=6.0.2",
-    "codecarbon>=2.6.0",
     "neptune>=1.11.1",
     "pytorch-lightning>=2.4.0",
     "dataclass-wizard>=0.22.3",
@@ -33,6 +30,8 @@ dependencies = [
     "rich>=13.8.0",
     "torchinfo>=1.8.0",
     "torchmetrics>=1.4.1",
+    "streamlit>=1.38.0",
+    "watchdog>=4.0.2",
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
