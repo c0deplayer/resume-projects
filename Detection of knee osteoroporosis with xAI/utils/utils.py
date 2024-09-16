@@ -39,15 +39,13 @@ class EarlyStopper:
         else:
             self.counter += 1
 
-            if self.counter >= self.patience:
-                if self.verbose:
-                    print(
-                        f"The metric has not improved for {self.counter} epochs. Stopping training."
-                    )
+            if self.verbose:
+                msg = f"The metric has not improved for {self.counter} epochs"
 
-                return True
-            elif self.verbose:
-                print(f"The metric has not improved for {self.counter} epochs")
+                if self.counter >= self.patience:
+                    msg += ". Stopping training"
+
+                print(msg)
 
         return False
 
