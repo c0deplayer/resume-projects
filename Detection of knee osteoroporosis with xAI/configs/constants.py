@@ -43,4 +43,4 @@ WEIGHTS = {
     "efficientnet_v2_s": EfficientNet_V2_S_Weights.IMAGENET1K_V1,
 }
 
-ACTIVATIONS = {"relu": torch.nn.ReLU, "silu": torch.nn.SiLU}
+ACTIVATIONS = {"relu": torch.nn.ReLU, "silu": torch.nn.SiLU, "gelu": torch.nn.GELU}
