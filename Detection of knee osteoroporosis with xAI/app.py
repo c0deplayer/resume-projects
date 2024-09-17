@@ -1,15 +1,17 @@
-from io import BytesIO
 import os
+from io import BytesIO
 from pathlib import Path
-import random
 
+import numpy as np
 import streamlit as st
 import torch
 import torch.nn as nn
 from configs.config import BaseConfig
-from configs.constants import ACTIVATIONS, CONFIGS, MODELS
+from configs.constants import ACTIVATIONS, CAM_METHODS, CONFIGS, MODELS
 from model import build_model
 from PIL import Image
+from pytorch_grad_cam.base_cam import BaseCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 from torchvision.transforms import v2
 from utils import utils
 
@@ -49,17 +51,41 @@ def init_model(
     return model, config
 
 
+@st.cache_data(ttl=120)
 def predict(
-    model: nn.Module, image: Image.Image, transform: v2.Compose, *, device: torch.device
-) -> torch.Tensor:
-    model.eval()
-    model = model.to(device)
+    _model: nn.Module,
+    _image: Image.Image,
+    _transform: v2.Compose,
+    *,
+    device: torch.device,
+    xai_method: BaseCAM | None = None,
+) -> torch.Tensor | tuple[torch.Tensor, Image.Image]:
+    model = _model.to(device)
 
-    image = transform(image)
-    image = image.unsqueeze(0)
-    image = image.to(device)
+    rgb_img = np.float32(_image.convert("RGB")) / 255
+    tensor_image = _transform(_image)
+    tensor_image = tensor_image.unsqueeze(0)
+    tensor_image = tensor_image.to(device)
 
-    output = model(image)
+    if xai_method:
+        target_layers = utils.get_target_layers(model, model.__class__.__name__)
+
+        with CAM_METHODS[xai_method](
+            model=model,
+            target_layers=target_layers,
+        ) as cam:
+            grayscale_cam = cam(
+                input_tensor=tensor_image, targets=None, aug_smooth=True
+            )
+            grayscale_cam = grayscale_cam[0, :]
+
+            cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+
+        return torch.softmax(cam.outputs, dim=1), Image.fromarray(
+            cam_image.astype("uint8"), "RGB"
+        )
+
+    output = model(tensor_image)
 
     return torch.softmax(output, dim=1)
 
@@ -72,12 +98,6 @@ def download_image(byte_img: bytes):
         file_name="xray_with_xai.png",
         mime="image/png",
     )
-
-
-def get_image_from_test_dataset() -> Path:
-    test_dataset_path = Path("./dataset/knee-osteoarthritis/test").resolve()
-
-    return random.choice(list(test_dataset_path.rglob("*")))
 
 
 if __name__ == "__main__":
@@ -151,20 +171,13 @@ if __name__ == "__main__":
                 label_visibility="collapsed",
             )
         else:
-            uploaded_img = get_image_from_test_dataset()
+            uploaded_img = utils.get_image_from_test_dataset()
 
         st.subheader("Options")
 
-        use_xai = st.checkbox(
-            "Use xAI (WIP)",
-            help="Use explainable AI to explain the prediction. "
-            + "This will slow down the prediction process, but it will provide insights into the model's decision-making process. "
-            + "This feature is a work in progress and do nothing at the moment.",
-        )
-
         use_gpu_mps = st.checkbox(
             "Use GPU/MPS",
-            help="Use the GPU or MPS (Apple Silicon) to speed up the prediction process.",
+            help="Use the GPU or MPS (Apple Silicon) to speed up the prediction process (if you have a compatible device).",
         )
 
         show_confidence = st.checkbox(
@@ -172,6 +185,33 @@ if __name__ == "__main__":
             value=True,
             help="Show the confidence of the model in the prediction as a bar chart.",
         )
+
+        use_xai = st.checkbox(
+            "Use xAI",
+            help="Use explainable AI to explain the prediction. "
+            + "This will slow down the prediction process, but it will provide insights into the model's decision-making process. ",
+        )
+
+        if use_xai:
+            xai_method = st.selectbox(
+                label="Select xAI method",
+                options=CAM_METHODS,
+                index=len(CAM_METHODS) - 1,
+            )
+            st.info(
+                "The xAI feature is experimental and may not work as expected. "
+                + "Currently, only EfficientNet models are supported for xAI.",
+                icon="ℹ️",
+            )
+        else:
+            xai_method = None
+
+        if xai_method in ["AblationCAM", "ScoreCAM"] and not use_gpu_mps:
+            st.warning(
+                f"Without using the GPU/MPS, the xAI methods '{xai_method}' may take a long time to process. "
+                + "Consider enabling the 'Use GPU/MPS' option to speed up the process. ",
+                icon="⚠️",
+            )
 
         if uploaded_img:
             image = Image.open(uploaded_img)
@@ -182,7 +222,13 @@ if __name__ == "__main__":
             model, config = init_model(selected_config, selected_weights)
             model.eval()
 
-            predictions = predict(model, image, transform, device=device)
+            if use_xai:
+                # print(model)
+                predictions, image = predict(
+                    model, image, transform, device=device, xai_method=xai_method
+                )
+            else:
+                predictions = predict(model, image, transform, device=device)
 
     with col2:
         if predictions is not None:

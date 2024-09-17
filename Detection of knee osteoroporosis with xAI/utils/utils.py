@@ -1,10 +1,14 @@
 import os
 import random
+import re
+from functools import reduce
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
 import torch
+import torch.nn as nn
+from configs.constants import TARGET_LAYERS
 
 
 class EarlyStopper:
@@ -163,3 +167,55 @@ def make_weights_for_balanced_classes(
     #     weights[idx] = weight_per_class[image_class]
 
     return weights
+
+
+def get_nested_attr(obj: Any, attr_list: list[str]) -> Any:
+    """
+    Retrieve a nested attribute from an object using a list of attribute names.
+    Supports indexed attributes (e.g., 'features[8]').
+
+    Args:
+        obj: The object from which to retrieve the attribute.
+        attr_list: A list of attribute names.
+
+    Returns:
+        The nested attribute.
+    """
+
+    def _get_attr(obj: Any, attr: str) -> Any:
+        match = re.match(r"(\w+)\[(\d+)\]", attr)
+
+        if match:
+            attr_name, index = match.groups()
+            return getattr(obj, attr_name)[int(index)]
+
+        return getattr(obj, attr)
+
+    return reduce(_get_attr, attr_list, obj)
+
+
+def get_target_layers(model: nn.Module, model_name: str) -> list[Any]:
+    """
+    Retrieve the target layers for a given model based on its name.
+
+    Args:
+        model: The model instance.
+        model_name: The name of the model.
+
+    Returns:
+        A list containing the target layer.
+    """
+    layers = TARGET_LAYERS.get(model_name)
+
+    if not layers:
+        raise ValueError(f"Model {model_name} is not supported.")
+
+    features_layer = get_nested_attr(model, layers)
+
+    return [features_layer]
+
+
+def get_image_from_test_dataset() -> Path:
+    test_dataset_path = Path("./dataset/knee-osteoarthritis/test").resolve()
+
+    return random.choice(list(test_dataset_path.rglob("*")))

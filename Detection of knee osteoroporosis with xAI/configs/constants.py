@@ -1,4 +1,15 @@
 import torch.optim
+from pytorch_grad_cam import (
+    AblationCAM,
+    EigenCAM,
+    EigenGradCAM,
+    GradCAM,
+    GradCAMElementWise,
+    GradCAMPlusPlus,
+    HiResCAM,
+    ScoreCAM,
+    XGradCAM,
+)
 from torchvision.models.convnext import ConvNeXt_Small_Weights, convnext_small
 from torchvision.models.densenet import DenseNet121_Weights, densenet121
 from torchvision.models.efficientnet import (
@@ -44,3 +55,19 @@ WEIGHTS = {
 }
 
 ACTIVATIONS = {"relu": torch.nn.ReLU, "silu": torch.nn.SiLU, "gelu": torch.nn.GELU}
+
+CAM_METHODS = {
+    "GradCAM": GradCAM,
+    "GradCAMPlusPlus": GradCAMPlusPlus,
+    "AblationCAM": AblationCAM,
+    "ScoreCAM": ScoreCAM,
+    "XGradCAM": XGradCAM,
+    "EigenCAM": EigenCAM,
+    "EigenGradCAM": EigenGradCAM,
+    "GradCAMElementWise": GradCAMElementWise,
+    "HiResCAM": HiResCAM,
+}
+
+TARGET_LAYERS = {
+    "EfficientNet": ["features[8]"],
+}
