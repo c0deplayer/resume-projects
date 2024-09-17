@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:f7c645e39be74f263a5c99906f64e078082607255f8821cdc27a8b4c285507eb"
+content_hash = "sha256:6fbfeda1d2133e4f7e307e95abc59cb33a015bea8a2d8793ed80ac47b4e9899b"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.13"
@@ -747,6 +747,27 @@ files = [
 ]
 
 [[package]]
+name = "grad-cam"
+version = "1.5.3"
+requires_python = ">=3.8"
+summary = "Many Class Activation Map methods implemented in Pytorch for classification, segmentation, object detection and more"
+groups = ["default"]
+dependencies = [
+    "Pillow",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "scikit-learn",
+    "torch>=1.7.1",
+    "torchvision>=0.8.2",
+    "tqdm",
+    "ttach",
+]
+files = [
+    {file = "grad-cam-1.5.3.tar.gz", hash = "sha256:abd3dc1bcdfa033fb6a355ea78a361d3ecfd18df541a29e61b2380843e41dd9c"},
+]
+
+[[package]]
 name = "graphviz"
 version = "0.20.3"
 requires_python = ">=3.8"
@@ -1380,24 +1401,6 @@ dependencies = [
 files = [
     {file = "lightning_utilities-0.11.6-py3-none-any.whl", hash = "sha256:ecd9953c316cbaf56ad820fbe7bd062187b9973c4a23d47b076cd59dc080a310"},
     {file = "lightning_utilities-0.11.6.tar.gz", hash = "sha256:79fc27ef8ec8b8d55a537920f2c7610270c0c9e037fa6efc78f1aa34ec8cdf04"},
-]
-
-[[package]]
-name = "lime"
-version = "0.2.0.1"
-requires_python = ">=3.5"
-summary = "Local Interpretable Model-Agnostic Explanations for machine learning classifiers"
-groups = ["default"]
-dependencies = [
-    "matplotlib",
-    "numpy",
-    "scikit-image>=0.12",
-    "scikit-learn>=0.18",
-    "scipy",
-    "tqdm",
-]
-files = [
-    {file = "lime-0.2.0.1.tar.gz", hash = "sha256:76960e4f055feb53e89b5022383bafc87b63f25bac6265984b0a333d1a57f781"},
 ]
 
 [[package]]
@@ -3029,6 +3032,17 @@ dependencies = [
 ]
 files = [
     {file = "triton-3.0.0-1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:34e509deb77f1c067d8640725ef00c5cbfcb2052a1a3cb6a6d343841f92624eb"},
+]
+
+[[package]]
+name = "ttach"
+version = "0.0.3"
+requires_python = ">=3.0.0"
+summary = "Images test time augmentation with PyTorch."
+groups = ["default"]
+files = [
+    {file = "ttach-0.0.3-py3-none-any.whl", hash = "sha256:7000bb4334f856b0c79a341df386c92f1c76faf091043cc3cd7f541d2149faf8"},
+    {file = "ttach-0.0.3.tar.gz", hash = "sha256:120c4dd881feb0e9c8dd63b154f2655891c3e20689b68a94d162bfd5557bcb48"},
 ]
 
 [[package]]
