@@ -51,7 +51,6 @@ def init_model(
     return model, config
 
 
-@st.cache_data(ttl=120)
 def predict(
     _model: nn.Module,
     _image: Image.Image,
@@ -111,6 +110,7 @@ if __name__ == "__main__":
     prev_selected_model = None
     predictions = None
     config = None
+    xai_method = None
 
     st.set_page_config(layout="wide", page_title="Detection of knee osteoporosis")
 
@@ -203,8 +203,6 @@ if __name__ == "__main__":
                 + "Currently, only the ConvNeXt model is not supported for xAI. ",
                 icon="ℹ️",
             )
-        else:
-            xai_method = None
 
         if xai_method in ["AblationCAM", "ScoreCAM"] and not use_gpu_mps:
             st.warning(
