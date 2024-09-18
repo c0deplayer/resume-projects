@@ -49,9 +49,9 @@ MODELS = {
 
 WEIGHTS = {
     "densenet121": DenseNet121_Weights.IMAGENET1K_V1,
-    "convnext_small": ConvNeXt_Small_Weights.IMAGENET1K_V1,
-    "efficientnet_b3": EfficientNet_B3_Weights.IMAGENET1K_V1,
-    "efficientnet_v2_s": EfficientNet_V2_S_Weights.IMAGENET1K_V1,
+    "convnextsmall": ConvNeXt_Small_Weights.IMAGENET1K_V1,
+    "efficientnetb3": EfficientNet_B3_Weights.IMAGENET1K_V1,
+    "efficientnetv2s": EfficientNet_V2_S_Weights.IMAGENET1K_V1,
 }
 
 ACTIVATIONS = {"relu": torch.nn.ReLU, "silu": torch.nn.SiLU, "gelu": torch.nn.GELU}
@@ -69,5 +69,7 @@ CAM_METHODS = {
 }
 
 TARGET_LAYERS = {
-    "EfficientNet": ["features[8]"],
+    "efficientnetb3": ["features[8]"],
+    "densenet121": ["features", "denseblock4", "denselayer16"],
+    "efficientnetv2s": ["features[7]"]
 }

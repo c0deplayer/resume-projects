@@ -1,9 +1,11 @@
+import re
 from typing import Any, Optional
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
+from configs.constants import ACTIVATIONS, WEIGHTS
 from rich.progress import track
 from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
@@ -14,8 +16,6 @@ from torchmetrics.classification import (
     MulticlassPrecision,
     MulticlassRecall,
 )
-
-from configs.constants import ACTIVATIONS, WEIGHTS
 from utils.utils import EarlyStopper
 
 
@@ -26,8 +26,9 @@ def build_model(
     trainable_model: bool = False,
     hidden_size: int = 256,
     dropout: float = 0.4,
-) -> tuple[Any, str]:
+) -> nn.Module:
     model_name = model.__name__.lower()
+    model_name = re.sub(r"[^a-zA-Z0-9]", "", model_name)
     pretrained_model = model(weights=WEIGHTS[model_name])
 
     if "densenet" in model_name:
@@ -42,27 +43,42 @@ def build_model(
         #     nn.Linear(hidden_size, class_count),
         # )
         pretrained_model.classifier = nn.Linear(num_features, class_count)
-    elif (
-        "efficientnet" in model_name
-        or "efficientnet_v2" in model_name
-        or "convnext" in model_name
-    ):
-        for name, param in pretrained_model.named_parameters():
+    elif "efficientnet" in model_name or "efficientnet_v2" in model_name:
+        for param in pretrained_model.parameters():
             param.requires_grad = trainable_model
-            print(name)
-            
+
         num_features = pretrained_model.classifier[-1].in_features
+        pretrained_model.classifier = nn.Sequential(
+            nn.Linear(num_features, hidden_size),
+            activation(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, class_count),
+        )
+        # pretrained_model.classifier = nn.Linear(num_features, class_count)
+    elif "convnext" in model_name:
+        for name, param in pretrained_model.named_parameters():
+            if "7" not in name:
+                param.requires_grad = False
+
+        num_features = pretrained_model.classifier[-1].in_features
+        # pretrained_model.classifier[-1] = nn.Linear(num_features, hidden_size)
+        # pretrained_model.classifier.append(activation())
+        # pretrained_model.classifier.append(nn.Dropout(dropout))
+        # pretrained_model.classifier.append(nn.Linear(hidden_size, class_count))
         # pretrained_model.classifier = nn.Sequential(
+        #     nn.Flatten(start_dim=1, end_dim=-1),
         #     nn.Linear(num_features, hidden_size),
         #     activation(),
         #     nn.Dropout(dropout),
         #     nn.Linear(hidden_size, class_count),
         # )
-        pretrained_model.classifier = nn.Linear(num_features, class_count)
+        pretrained_model.classifier[-1] = nn.Linear(num_features, class_count)
     else:
         raise NotImplementedError()
 
-    return pretrained_model, model_name
+    pretrained_model.name = model_name
+
+    return pretrained_model
 
 
 def train_loop(

@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     utils.seed_everything(config.seed)
 
-    model, model_name = build_model(
+    model = build_model(
         class_count=class_count,
         model=MODELS[args.model],
         hidden_size=config.hidden_size,
@@ -121,11 +121,9 @@ if __name__ == "__main__":
         worker_init_fn=lambda _: np.random.seed(config.seed),
     )
 
-    model_name = re.sub(r"[^a-zA-Z0-9]", "", model_name)
-
     checkpoint_filepath = (
         Path(config.checkpoint_path).resolve()
-        / f"{args.model}/best-model-{model_name}-{datetime.now().strftime('%Y%m%d')}.pth"
+        / f"{args.model}/best-model-{model.name}-{datetime.now().strftime('%Y%m%d')}.pth"
     )
 
     checkpoint_filepath = utils.unique_path(checkpoint_filepath)
@@ -165,7 +163,7 @@ if __name__ == "__main__":
         try:
             neptune.init_model(
                 name=args.exp_name,
-                key=f"{model_name[0].upper()}{model_name[-4:].upper()}",
+                key=f"{model.name[0].upper()}{model.name[-4:].upper()}",
                 project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
                 api_token=neptune_token,
             )
@@ -173,7 +171,7 @@ if __name__ == "__main__":
             pass
 
         model_version = neptune.init_model_version(
-            model=f"DOFKO-{model_name[0].upper()}{model_name[-4:].upper()}",
+            model=f"DOFKO-{model.name[0].upper()}{model.name[-4:].upper()}",
             project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
             api_token=neptune_token,
         )
@@ -200,7 +198,7 @@ if __name__ == "__main__":
     val_pred = np.argmax(np.concatenate(val_pred_list, axis=0), axis=1)
 
     matrix_plot_path = utils.unique_path(
-        Path(f"./plots/{model_name}/confusion_matrix.png")
+        Path(f"./plots/{model.name}/confusion_matrix.png")
     )
 
     os.makedirs(matrix_plot_path.parent, exist_ok=True)

@@ -49,11 +49,9 @@ This project focuses on developing deep learning models to detect and classify k
 
 **Future Work**
 
-- Complete the implementation of EfficientNetV2 and ConvNeXt models in PyTorch
 - Further explore techniques to handle class imbalance
 - Further experimentation with models.
 - Check other models for this project like U-Net.
-- Complete the implementation of xAI in PyTorch.
 
 ## [Wine Quality Prediction](./Wine%20Quality%20Prediction/)
 

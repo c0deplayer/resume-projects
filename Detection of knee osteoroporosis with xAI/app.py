@@ -36,7 +36,7 @@ def init_model(
 
     utils.seed_everything(config.seed)
 
-    model, _ = build_model(
+    model = build_model(
         class_count=class_count,
         model=MODELS[selected_model],
         hidden_size=config.hidden_size,
@@ -68,7 +68,7 @@ def predict(
     tensor_image = tensor_image.to(device)
 
     if xai_method:
-        target_layers = utils.get_target_layers(model, model.__class__.__name__)
+        target_layers = utils.get_target_layers(model, model.name)
 
         with CAM_METHODS[xai_method](
             model=model,
@@ -200,7 +200,7 @@ if __name__ == "__main__":
             )
             st.info(
                 "The xAI feature is experimental and may not work as expected. "
-                + "Currently, only EfficientNet models are supported for xAI.",
+                + "Currently, only the ConvNeXt model is not supported for xAI. ",
                 icon="ℹ️",
             )
         else:

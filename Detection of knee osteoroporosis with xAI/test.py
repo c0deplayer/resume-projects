@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     utils.seed_everything(config.seed)
 
-    model, _ = build_model(
+    model = build_model(
         class_count=class_count,
         model=MODELS[args.model],
         hidden_size=config.hidden_size,
