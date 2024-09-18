@@ -15,16 +15,16 @@ num_of_samples:
   1: 2000
 img_size: [244, 244]
 shuffle: True
-augment: False
+augment: True
 augment_v2: False
 
 epochs: 50
-batch_size: 32
-hidden_size: 256
-dropout: 0.5
+batch_size: 80
+hidden_size: 128
+dropout: 0.4
 trainable_model: True
 learning_rate: 1e-3
-activation: "relu"
+activation: "silu"
 optimizer: "AdamW"
 weight_decay: 1e-2
 # momentum: 0.9
