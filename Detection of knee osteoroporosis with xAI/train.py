@@ -1,28 +1,33 @@
 import argparse
 import os
-import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import neptune
 import numpy as np
 import torch
 import torch.nn as nn
+from configs.constants import ACTIVATIONS, CONFIGS, MODELS, OPTIMIZERS
+from dataset.dataset import ImageDataset
 from dotenv import load_dotenv
+from model import build_model, train_loop
 from neptune.exceptions import NeptuneModelKeyAlreadyExistsError
 from rich.progress import track
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchinfo import summary
-
-from configs.constants import ACTIVATIONS, CONFIGS, MODELS, OPTIMIZERS
-from dataset.dataset import ImageDataset
-from model import build_model, train_loop
 from utils import utils
 from utils.visualize import plot_confusion_matrix
 
 
-def cli_main():
+def cli_main() -> argparse.Namespace:
+    """
+    Parse command-line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
     parser = argparse.ArgumentParser(
         description="Train a model for knee osteoporosis detection"
     )
@@ -41,7 +46,6 @@ def cli_main():
         help="Flag for using Neptune for logging",
         action="store_true",
     )
-
     parser.add_argument(
         "--exp-name",
         help="Name of the experiment",
@@ -50,37 +54,68 @@ def cli_main():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-    load_dotenv()
-    args = cli_main()
+def initialize_neptune(
+    args: argparse.Namespace, model_name: str, config_file: str, neptune_token: str
+) -> tuple[neptune.Run, neptune.ModelVersion]:
+    """
+    Initialize Neptune for logging and model versioning.
 
-    config_file = f"{Path().resolve()}/configs/{args.model}/{args.config}"
-    config = CONFIGS[args.model].from_yaml_file(file=config_file)
-    class_count = len(config.label_map_legend)
-    neptune_token = os.environ["NEPTUNE_API_TOKEN"]
+    Args:
+        args (argparse.Namespace): Parsed command-line arguments.
+        model_name (str): The name of the model.
+        config_file (str): Path to the configuration file.
+        neptune_token (str): Neptune API token.
 
-    utils.seed_everything(config.seed)
+    Returns:
+        Tuple[neptune.Run, neptune.ModelVersion]: Neptune run and model version objects.
+    """
+    if not args.exp_name:
+        raise ValueError("Please provide the name of the experiment")
 
-    model = build_model(
-        class_count=class_count,
-        model=MODELS[args.model],
-        hidden_size=config.hidden_size,
-        dropout=config.dropout,
-        activation=ACTIVATIONS[config.activation],
-        trainable_model=config.trainable_model,
+    run = neptune.init_run(
+        name=args.exp_name,
+        project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
+        api_token=neptune_token,
+        source_files=["**/*.py", config_file],
+        dependencies="/Users/codeplayer/Różne rzeczy/Resume Projects/pyproject.toml",
     )
 
-    optimizer = OPTIMIZERS[config.optimizer](
-        model.parameters(),
-        lr=config.learning_rate,
-        weight_decay=config.weight_decay,
-        # momentum=config.momentum,
+    try:
+        neptune.init_model(
+            name=args.exp_name,
+            key=f"{model_name[0].upper()}{model_name[-4:].upper()}",
+            project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
+            api_token=neptune_token,
+        )
+    except NeptuneModelKeyAlreadyExistsError:
+        pass
+
+    model_version = neptune.init_model_version(
+        model=f"DOFKO-{model_name[0].upper()}{model_name[-4:].upper()}",
+        project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
+        api_token=neptune_token,
     )
-    criterion = nn.CrossEntropyLoss()
 
-    g = torch.Generator()
-    g.manual_seed(config.seed)
+    model_version["run/id"] = run["sys/id"].fetch()
+    model_version["run/url"] = run.get_url()
 
+    return run, model_version
+
+
+def prepare_dataloaders(
+    config: Any, class_count: int, g: torch.Generator
+) -> tuple[DataLoader, DataLoader]:
+    """
+    Prepare the training and validation dataloaders.
+
+    Args:
+        config (Any): Configuration object.
+        class_count (int): Number of classes.
+        g (torch.Generator): Random generator for reproducibility.
+
+    Returns:
+        Tuple[DataLoader, DataLoader]: Training and validation dataloaders.
+    """
     train_dataset = ImageDataset(
         config,
         mode="train",
@@ -121,6 +156,42 @@ if __name__ == "__main__":
         worker_init_fn=lambda _: np.random.seed(config.seed),
     )
 
+    return train_dataloader, val_dataloader
+
+
+def main():
+    load_dotenv()
+    args = cli_main()
+
+    config_file = f"{Path().resolve()}/configs/{args.model}/{args.config}"
+    config = CONFIGS[args.model].from_yaml_file(file=config_file)
+    class_count = len(config.label_map_legend)
+    neptune_token = os.environ["NEPTUNE_API_TOKEN"]
+
+    utils.seed_everything(config.seed)
+
+    model = build_model(
+        class_count=class_count,
+        model=MODELS[args.model],
+        hidden_size=config.hidden_size,
+        dropout=config.dropout,
+        activation=ACTIVATIONS[config.activation],
+        trainable_model=config.trainable_model,
+    )
+
+    optimizer = OPTIMIZERS[config.optimizer](
+        model.parameters(),
+        lr=config.learning_rate,
+        weight_decay=config.weight_decay,
+        # momentum=config.momentum,
+    )
+    criterion = nn.CrossEntropyLoss()
+
+    g = torch.Generator()
+    g.manual_seed(config.seed)
+
+    train_dataloader, val_dataloader = prepare_dataloaders(config, class_count, g)
+
     checkpoint_filepath = (
         Path(config.checkpoint_path).resolve()
         / f"{args.model}/best-model-{model.name}-{datetime.now().strftime('%Y%m%d')}.pth"
@@ -136,7 +207,7 @@ if __name__ == "__main__":
 
     model_train_params = dict(
         model=model,
-        criterion=nn.CrossEntropyLoss(),
+        criterion=criterion,
         optimizer=optimizer,
         train_loader=train_dataloader,
         val_loader=val_dataloader,
@@ -149,36 +220,9 @@ if __name__ == "__main__":
     )
 
     if args.neptune:
-        if not args.exp_name:
-            raise ValueError("Please provide the name of the experiment")
-
-        run = neptune.init_run(
-            name=args.exp_name,
-            project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
-            api_token=neptune_token,
-            source_files=["**/*.py", config_file],
-            dependencies="/Users/codeplayer/Różne rzeczy/Resume Projects/pyproject.toml",
+        run, model_version = initialize_neptune(
+            args, model.name, config_file, neptune_token
         )
-
-        try:
-            neptune.init_model(
-                name=args.exp_name,
-                key=f"{model.name[0].upper()}{model.name[-4:].upper()}",
-                project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
-                api_token=neptune_token,
-            )
-        except NeptuneModelKeyAlreadyExistsError:
-            pass
-
-        model_version = neptune.init_model_version(
-            model=f"DOFKO-{model.name[0].upper()}{model.name[-4:].upper()}",
-            project="codeplayer/Detection-of-knee-osteoroporosis-with-xAI",
-            api_token=neptune_token,
-        )
-
-        model_version["run/id"] = run["sys/id"].fetch()
-        model_version["run/url"] = run.get_url()
-
         model_train_params["neptune_experiment"] = run
 
     summary(model, input_size=next(iter(train_dataloader))[0].size())
@@ -218,3 +262,7 @@ if __name__ == "__main__":
 
         run.stop()
         model_version.stop()
+
+
+if __name__ == "__main__":
+    main()

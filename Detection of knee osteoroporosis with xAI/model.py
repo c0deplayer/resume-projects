@@ -27,6 +27,20 @@ def build_model(
     hidden_size: int = 256,
     dropout: float = 0.4,
 ) -> nn.Module:
+    """
+    Build a model with a custom classifier.
+
+    Args:
+        model (torchvision.models): The base model to use.
+        class_count (int): The number of output classes.
+        activation (nn.Module): The activation function to use.
+        trainable_model (bool): Whether the base model's parameters should be trainable.
+        hidden_size (int): The size of the hidden layer in the classifier.
+        dropout (float): The dropout rate to use in the classifier.
+
+    Returns:
+        nn.Module: The model with the custom classifier.
+    """
     model_name = model.__name__.lower()
     model_name = re.sub(r"[^a-zA-Z0-9]", "", model_name)
     pretrained_model = model(weights=WEIGHTS[model_name])
@@ -43,7 +57,7 @@ def build_model(
         #     nn.Linear(hidden_size, class_count),
         # )
         pretrained_model.classifier = nn.Linear(num_features, class_count)
-    elif "efficientnet" in model_name or "efficientnet_v2" in model_name:
+    elif "efficientnet" in model_name or "efficientnetv2" in model_name:
         for param in pretrained_model.parameters():
             param.requires_grad = trainable_model
 
@@ -96,13 +110,11 @@ def train_loop(
     early_stopper: Optional[EarlyStopper] = None,
     checkpoint_filepath: Optional[str] = None,
 ) -> nn.Module:
-    model = model.to(device)
-
     for epoch in range(epochs):
         if not next(model.parameters()).is_mps or not next(model.parameters()).is_cuda:
             model = model.to(device)
 
-        train_loss, train_accuracy = train(
+        train_loss, train_accuracy = __train(
             model=model,
             criterion=criterion,
             optimizer=optimizer,
@@ -111,7 +123,7 @@ def train_loop(
             class_count=class_count,
         )
 
-        val_loss, val_metrics = validation(
+        val_loss, val_metrics = __validation(
             model=model,
             criterion=criterion,
             val_loader=val_loader,
@@ -129,38 +141,84 @@ def train_loop(
         )
 
         if neptune_experiment is not None:
-            neptune_experiment["train/loss"].append(train_loss)
-            neptune_experiment["train/accuracy"].append(train_accuracy)
-            neptune_experiment["val/loss"].append(val_loss)
-            neptune_experiment["val/f2-score"].append(val_metrics[0])
-            neptune_experiment["val/precision"].append(val_metrics[3])
-            neptune_experiment["val/recall"].append(val_metrics[2])
-            neptune_experiment["val/accuracy"].append(val_metrics[1])
-
-            msg = (
-                f" End of epoch {epoch} val_loss: {val_loss} - val_f2: {val_metrics[0]} — val_precision: "
-                f"{val_metrics[3]}, — val_recall: {val_metrics[2]} — val_accuracy: {val_metrics[1]}"
+            __log_neptune_metrics(
+                neptune_experiment,
+                train_loss,
+                train_accuracy,
+                val_loss,
+                val_metrics,
+                epoch,
             )
-            neptune_experiment[f"Epoch End Metrics (each step)"].log(msg)
 
         if early_stopper is not None and checkpoint_filepath is not None:
-            if (
-                val_loss < early_stopper.best_score
-                and early_stopper.monitor_metric == torch.lt
-            ) or (
-                val_loss > early_stopper.best_score
-                and early_stopper.monitor_metric == torch.gt
-            ):
-                early_stopper.save_model(model, checkpoint_filepath)
-
-            if early_stopper.early_stop(val_loss):
-                model.load_state_dict(early_stopper.model_state_dict)
-                break
+            __handle_early_stopping(early_stopper, model, val_loss, checkpoint_filepath)
 
     return model
 
 
-def train(
+def __log_neptune_metrics(
+    neptune_experiment: Any,
+    train_loss: float,
+    train_accuracy: float,
+    val_loss: float,
+    val_metrics: list,
+    epoch: int,
+) -> None:
+    """
+    Log the metrics to Neptune.
+
+    Args:
+        neptune_experiment (Any): Neptune experiment for logging metrics.
+        train_loss (float): The training loss.
+        train_accuracy (float): The training accuracy.
+        val_loss (float): The validation loss.
+        val_metrics (list): The validation metrics.
+        epoch (int): The current epoch.
+    """
+    neptune_experiment["train/loss"].append(train_loss)
+    neptune_experiment["train/accuracy"].append(train_accuracy)
+    neptune_experiment["val/loss"].append(val_loss)
+    neptune_experiment["val/f2-score"].append(val_metrics[0])
+    neptune_experiment["val/precision"].append(val_metrics[3])
+    neptune_experiment["val/recall"].append(val_metrics[2])
+    neptune_experiment["val/accuracy"].append(val_metrics[1])
+
+    msg = (
+        f" End of epoch {epoch} val_loss: {val_loss} - val_f2: {val_metrics[0]} — val_precision: "
+        f"{val_metrics[3]}, — val_recall: {val_metrics[2]} — val_accuracy: {val_metrics[1]}"
+    )
+    neptune_experiment[f"Epoch End Metrics (each step)"].log(msg)
+
+
+def __handle_early_stopping(
+    early_stopper: EarlyStopper,
+    model: nn.Module,
+    val_loss: float,
+    checkpoint_filepath: str,
+) -> None:
+    """
+    Handle early stopping and model checkpointing.
+
+    Args:
+        early_stopper (EarlyStopper): Early stopping utility.
+        model (nn.Module): The model to save.
+        val_loss (float): The validation loss.
+        checkpoint_filepath (str): Filepath to save the model checkpoint.
+    """
+    if (
+        val_loss < early_stopper.best_score and early_stopper.monitor_metric == torch.lt
+    ) or (
+        val_loss > early_stopper.best_score and early_stopper.monitor_metric == torch.gt
+    ):
+        early_stopper.save_model(model, checkpoint_filepath)
+
+    if early_stopper.early_stop(val_loss):
+        model.load_state_dict(early_stopper.model_state_dict)
+
+    return model
+
+
+def __train(
     model: nn.Module,
     criterion: nn.Module,
     optimizer: Optimizer,
@@ -169,6 +227,20 @@ def train(
     *,
     device: torch.device,
 ) -> tuple[float, float]:
+    """
+    Train the model for one epoch.
+
+    Args:
+        model (nn.Module): The model to train.
+        criterion (nn.Module): The loss function.
+        optimizer (Optimizer): The optimizer.
+        train_loader (torch.utils.data.DataLoader): DataLoader for the training data.
+        class_count (int): The number of classes.
+        device (torch.device): The device to train on.
+
+    Returns:
+        Tuple[float, float]: The average training loss and training accuracy.
+    """
     model.train()
     accuracy = MulticlassAccuracy(average="micro", num_classes=class_count).to(device)
 
@@ -182,9 +254,7 @@ def train(
         optimizer.step()
 
         target = torch.argmax(label, dim=1)
-
         accuracy.update(preds=output, target=target)
-
         total_train_loss += loss.item()
 
     total_train_loss = round(total_train_loss / len(train_loader), 4)
@@ -193,14 +263,27 @@ def train(
     return total_train_loss, train_accuracy
 
 
-def validation(
+def __validation(
     model: nn.Module,
     criterion: nn.Module,
     val_loader: torch.utils.data.DataLoader,
     class_count: int,
     *,
     device: torch.device,
-):
+) -> tuple[float, tuple[float, float, float, float]]:
+    """
+    Validate the model.
+
+    Args:
+        model (nn.Module): The model to validate.
+        criterion (nn.Module): The loss function.
+        val_loader (torch.utils.data.DataLoader): DataLoader for the validation data.
+        class_count (int): The number of classes.
+        device (torch.device): The device to validate on.
+
+    Returns:
+        Tuple[float, Tuple[float, float, float, float]]: The average validation loss and validation metrics (F2 score, accuracy, recall, precision).
+    """
     model.eval()
     f2_score = MulticlassFBetaScore(
         average="macro", num_classes=class_count, beta=2.0
@@ -213,12 +296,10 @@ def validation(
     for img, label in track(val_loader, description="Validation..."):
         with torch.inference_mode():
             img, label = img.to(device), label.type(torch.FloatTensor).to(device)
-
             output = model(img)
             val_loss = criterion(output, label)
 
             target = torch.argmax(label, dim=1)
-
             f2_score.update(preds=output, target=target)
             precision.update(preds=output, target=target)
             recall.update(preds=output, target=target)
@@ -227,7 +308,6 @@ def validation(
             total_val_loss += val_loss.item()
 
     total_val_loss = round(total_val_loss / len(val_loader), 4)
-
     val_metrics = (
         round(f2_score.compute().item(), 4),
         round(accuracy.compute().item(), 4),

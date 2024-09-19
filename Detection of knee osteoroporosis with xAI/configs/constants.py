@@ -1,4 +1,5 @@
 import torch.optim
+import torchvision
 from pytorch_grad_cam import (
     AblationCAM,
     EigenCAM,
@@ -10,6 +11,7 @@ from pytorch_grad_cam import (
     ScoreCAM,
     XGradCAM,
 )
+from pytorch_grad_cam.base_cam import BaseCAM
 from torchvision.models.convnext import ConvNeXt_Small_Weights, convnext_small
 from torchvision.models.densenet import DenseNet121_Weights, densenet121
 from torchvision.models.efficientnet import (
@@ -20,43 +22,48 @@ from torchvision.models.efficientnet import (
 )
 
 from .config import (
+    BaseConfig,
     ConvNeXtConfig,
     DenseNetConfig,
     EfficientNetConfig,
     EfficientNetV2Config,
 )
 
-CONFIGS = {
+CONFIGS: dict[str, BaseConfig] = {
     "DenseNet": DenseNetConfig,
     "ConvNeXt": ConvNeXtConfig,
     "EfficientNet": EfficientNetConfig,
     "EfficientNetV2": EfficientNetV2Config,
 }
 
-OPTIMIZERS = {
+OPTIMIZERS: dict[str, torch.optim.Optimizer] = {
     "Adam": torch.optim.Adam,
     "AdamW": torch.optim.AdamW,
     "SDG": torch.optim.SGD,
     # "Lion": lion,
 }
 
-MODELS = {
+MODELS: dict[str, torch.nn.Module] = {
     "DenseNet": densenet121,
     "ConvNeXt": convnext_small,
     "EfficientNet": efficientnet_b3,
     "EfficientNetV2": efficientnet_v2_s,
 }
 
-WEIGHTS = {
+WEIGHTS: dict[str, torchvision.models.Weights] = {
     "densenet121": DenseNet121_Weights.IMAGENET1K_V1,
     "convnextsmall": ConvNeXt_Small_Weights.IMAGENET1K_V1,
     "efficientnetb3": EfficientNet_B3_Weights.IMAGENET1K_V1,
     "efficientnetv2s": EfficientNet_V2_S_Weights.IMAGENET1K_V1,
 }
 
-ACTIVATIONS = {"relu": torch.nn.ReLU, "silu": torch.nn.SiLU, "gelu": torch.nn.GELU}
+ACTIVATIONS: dict[str, torch.nn.Module] = {
+    "relu": torch.nn.ReLU,
+    "silu": torch.nn.SiLU,
+    "gelu": torch.nn.GELU,
+}
 
-CAM_METHODS = {
+CAM_METHODS: dict[str, BaseCAM] = {
     "GradCAM": GradCAM,
     "GradCAMPlusPlus": GradCAMPlusPlus,
     "AblationCAM": AblationCAM,
@@ -68,8 +75,8 @@ CAM_METHODS = {
     "HiResCAM": HiResCAM,
 }
 
-TARGET_LAYERS = {
+TARGET_LAYERS: dict[str, list[str]] = {
     "efficientnetb3": ["features[8]"],
     "densenet121": ["features", "denseblock4", "denselayer16"],
-    "efficientnetv2s": ["features[7]"]
+    "efficientnetv2s": ["features[7]"],
 }
